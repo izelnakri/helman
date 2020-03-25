@@ -1,7 +1,7 @@
 #! /usr/bin/env node
 import chalk from 'ansi-colors';
 
-process.title = 'helmp';
+process.title = 'helman';
 
 let shouldRunCommand = false;
 
@@ -28,7 +28,7 @@ const CLI = {
   CLI.default(async () => await runCommand('./commands/index.js'));
 
   if (!shouldRunCommand) {
-    console.log(chalk.red('helmp unknown command. Available options are:'));
+    console.log(chalk.red('helman unknown command. Available options are:'));
 
     await runCommand('./commands/index.js');
 
