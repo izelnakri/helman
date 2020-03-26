@@ -16,7 +16,7 @@ npm install -g helman
 
 helman help
 
-helman init # creates npm-package.json like helm.json and helm_charts folder
+helman init # creates npm/package.json like helm.json and helm_charts folder
 
 helman install jetstack/cert-manager
 # -> looks up and adds jetstack repo to helm if doesnt exists,

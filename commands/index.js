@@ -10,7 +10,7 @@ const highlight = (text) => chalk.cyan.bold(text);
 export default async function() {
   const config = JSON.parse((await fs.readFile(`${__dirname}/../package.json`)));
 
-  console.log(`${highlight("helman v" + config.version + " Usage:")} helmp ${chalk.yellow('<command (Default: help)>')}
+  console.log(`${highlight("helman v" + config.version + " Usage:")} helman ${chalk.yellow('<command (Default: help)>')}
 helman init | new                     # [soon] Sets up the initial helm.json and helm_charts folder
 helman install | i [chartName]        # [soon] Installs the latest helm chart to helm_charts if --save is provided saves to helm.json
 `);

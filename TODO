@@ -1,0 +1,14 @@
+helm repo add stable
+helm repo update
+helm template [releaseName] stable/nginx-ingress
+
+- problem with this is no versioning
+- no local caching(relies on network & github to fetch the data)
+- also avoided helm releases this way(why do I need helm releases?)
+
+
+shasum checks/signing
+
+charts
+
+mind that k8s secrets stored in base64
