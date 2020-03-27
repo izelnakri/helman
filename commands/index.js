@@ -11,7 +11,9 @@ export default async function() {
   const config = JSON.parse((await fs.readFile(`${__dirname}/../package.json`)));
 
   console.log(`${highlight("helman v" + config.version + " Usage:")} helman ${chalk.yellow('<command (Default: help)>')}
-helman init | new                     # [soon] Sets up the initial helm.json and helm_charts folder
-helman install | i [chartName]        # [soon] Installs the latest helm chart to helm_charts if --save is provided saves to helm.json
+helman init | new                     # [soon] Sets up the initial helm.json, helm_charts and k8s kustomize folder
+helman install | i [chartName]        # [soon] Installs the latest helm chart to helm_charts and to helm.json
+helman uninstall | u [chartName]      # [soon] Uninstall the helm chart from helm_charts, helm.json and k8s kustomize folder
+helman build | b                      # [soon] reads all charts from helm.json and helm templates/outputs them to k8s kustomization base for each chart
 `);
 }

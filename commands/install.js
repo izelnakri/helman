@@ -3,7 +3,7 @@ import { promisify } from 'util';
 const shell = promisify(exec);
 
 // NOTE: dependencies: { repo/chartName: version, repo/chartName: version }
-// NOTE: installConfiguration: { projectRoot, helmJSON, saveToJSONMode, existingRepos }
+// NOTE: installConfiguration: { projectRoot, helmJSON, saveToJSONMode }
 export default async function () {
   let targetArgs = process.argv.slice(3);
 
@@ -30,8 +30,7 @@ export default async function () {
   }, [false, []]);
   let projectRoot = await findProjectRoot('helm.json') || await findProjectRoot('package.json');
   let helmJSON = JSON.parse((await fs.readFile(`${projectRoot}/helm.json`)).toString());
-  // TODO: checkExistingHelmRepos
-  let installConfiguration = { projectRoot, helmJSON, saveToJSONMode, existingRepos: []);
+  let installConfiguration = { projectRoot, helmJSON, saveToJSONMode };
 
   return await Promise.all(targetHelmPackages.map((helmPackage) => {
     return installPackageToProject(helmPackage, installConfiguration);
@@ -50,12 +49,7 @@ async function installAllPackagesFromHelmJSON() {
   }
 
   let helmJSON = JSON.parse((await fs.readFile(`${projectRoot}/helm.json`)).toString());
-
-  // TODO: check if the repo exists or add the repo
-  // TODO: checkExistingHelmRepos
-  // TODO: addToHelmRepo()
-
-  let installConfiguration = { projectRoot, helmJSON, saveToJSONMode: false, existingRepos: [] };
+  let installConfiguration = { projectRoot, helmJSON, saveToJSONMode: false };
 
   return await Promise.all(
     Object.keys(helmJSON.dependencies).map((dependency) => {
@@ -64,7 +58,7 @@ async function installAllPackagesFromHelmJSON() {
   );
 }
 
-// NOTE: installConfiguration: { projectRoot, helmJSON, saveToJSONMode, existingRepos }
+// NOTE: installConfiguration: { projectRoot, helmJSON, saveToJSONMode, }
 async function installPackageToProject(dependency = {}, installConfiguration) {
   let declaredExistingPackageVersion = helmJSON.dependencies[`${dependency.repo}/${dependency.name}`];
 
@@ -77,10 +71,6 @@ async function installPackageToProject(dependency = {}, installConfiguration) {
 
   // TODO: addHelmPackageToHelmJSON
 }
-
-// async function checkExistingHelmRepos() {}
-
-// async function addToHelmRepo() {}
 
 // async function addHelmPackageToHelmJSON() {}
 

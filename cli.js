@@ -28,6 +28,8 @@ const CLI = {
   CLI.default(async () => await runCommand('./commands/index.js'));
   CLI.command(['new', 'init'], async () => await runCommand('./commands/init.js'));
   CLI.command(['install', 'i'], async () => await runCommand('./commands/install.js'));
+  CLI.command(['uninstall', 'u'], async () => await runCommand('./commands/uninstall.js'));
+  CLI.command(['build', 'b'], async () => await runCommand('./commands/build.js'));
 
   if (!shouldRunCommand) {
     console.log(chalk.red('helman unknown command. Available options are:'));
