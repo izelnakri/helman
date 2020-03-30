@@ -1,0 +1,12 @@
+on: [push]
+
+jobs:
+  my_first_job:
+    runs-on: ubuntu-18.04
+    steps:
+      - name: My first step
+        uses: docker://alpine:3.8
+      - name: Print uname
+        run: uname -a
+      - name: Print hello world
+        run: echo "Hello world"

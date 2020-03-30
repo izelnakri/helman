@@ -2,7 +2,7 @@
 
 The package manager layer on top of Helm and Kubernetes. Allows for helm chart based kustomizations.
 I hope functionality described in this cli tool will be a part of `helm` cli in future.
-In the meantime, this cli tool provides an essential complixity management to helm and kustomize workflows.
+In the meantime, this cli tool provides an essential complexity management to helm and kustomize workflows.
 
 ### System Requirements
 
@@ -30,7 +30,7 @@ helman install jetstack/cert-manager
 # -> builds the jetstack/cert-manager helm chart and creates k8s/bases/cert-manager/helm.yaml
 # -> links k8s/bases/cert-manager/helm.yaml to k8s/bases/cert-manager/kustomization.yaml
 
-# in case if jetstack/cert-manager isnt in your helm repo:
+# jetstack/cert-manager is a custom helm chart that isnt in stable repos, in case if jetstack isnt in your local helm repo:
 helm repo add jetstack https://charts.jetstack.io && helman install jetstack/cert-manager
 
 helman install stable/prometheus v0.8.1
