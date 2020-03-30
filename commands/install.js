@@ -1,76 +1,128 @@
+import { exec } from 'child_process';
 import { promisify } from 'util';
+// import chalk from 'ansi-colors';
+import fs from 'fs-extra';
+import semver from 'semver';
+import YAML from 'yaml';
+import findProjectRoot from '../utils/find-project-root.js';
+import { setupHelmChartsFolder, setupK8SKustomizeFolder } from './init.js';
+import { buildHelmChart } from './build.js';
 
 const shell = promisify(exec);
 
+// TODO: k8s/bases/$chartName + building per each install + console notifications
 // NOTE: dependencies: { repo/chartName: version, repo/chartName: version }
-// NOTE: installConfiguration: { projectRoot, helmJSON, saveToJSONMode }
 export default async function () {
+  let projectRoot = (await findProjectRoot('helm.json')) || (await findProjectRoot('package.json'));
+
+  if (!(await fs.pathExists(`${projectRoot}/helm.json`))) {
+    throw new Error('helm.json does not exists in this project. Did you run $ helm init first?');
+  } else if (!(await fs.pathExists(`${projectRoot}/helm_charts`))) {
+    await setupHelmChartsFolder(projectRoot);
+  }
+
+  if (!(await fs.pathExists(`${projectRoot}/k8s`))) {
+    await setupK8SKustomizeFolder(projectRoot);
+  }
+
+  let helmJSON = JSON.parse((await fs.readFile(`${projectRoot}/helm.json`)).toString());
   let targetArgs = process.argv.slice(3);
 
   if (targetArgs.length === 0) {
-    return await installAllPackagesFromHelmJSON();
+    return await installAllPackagesFromHelmJSON(projectRoot, helmJSON);
   }
 
-  let [saveToJSONMode, targetHelmPackages] = targetArgs.reduce((result, arg) => {
-    if (args === '--save') {
-      result[0] = true;
-    } else if (args.includes('.') && /\d+\.\d+/g.test(args)) {
-      let lastIndex = result[1].length - 1;
-      let lastItem = result[1][lastIndex];
+  let targetHelmPackages = targetArgs.reduce((result, arg) => {
+    if (arg.includes('.') && /\d+\.\d+/g.test(arg)) {
+      let lastIndex = result.length - 1;
+      let lastItem = result[lastIndex];
 
-      result[1][lastIndex] = Object.assign(lastItem, { version: args }); // NOTE: check if version needs sanitization
-   } else {
-      let repo = args.includes('/') ? args.split('/')[0] : 'stable';
-      let name = args.includes('/') ? args.slice(args.indexOf('/') + 1) : args;
+      result[lastIndex] = Object.assign(lastItem, { version: semver.valid(semver.coerce(arg)) });
+    } else {
+      let repo = arg.includes('/') ? arg.split('/')[0] : 'stable';
+      let name = arg.includes('/') ? arg.slice(arg.indexOf('/') + 1) : arg;
 
-      result[1].push({ name, repo });
+      result.push({ name, repo });
     }
 
     return result;
-  }, [false, []]);
-  let projectRoot = await findProjectRoot('helm.json') || await findProjectRoot('package.json');
-  let helmJSON = JSON.parse((await fs.readFile(`${projectRoot}/helm.json`)).toString());
-  let installConfiguration = { projectRoot, helmJSON, saveToJSONMode };
+  }, []);
+  let targetChartVersions = await Promise.all(
+    targetHelmPackages.map((helmPackage) => installPackageToProject(helmPackage, projectRoot, helmJSON))
+  ); // [{ repo: '', name: '', version: '' }]
 
-  return await Promise.all(targetHelmPackages.map((helmPackage) => {
-    return installPackageToProject(helmPackage, installConfiguration);
-  }));
+  await fs.writeFile(
+    `${projectRoot}/helm.json`,
+    JSON.stringify(
+      Object.assign(helmJSON, {
+        dependencies: Object.assign(
+          {},
+          helmJSON.dependencies,
+          targetChartVersions.reduce((result, chartObject) => {
+            return Object.assign(result, {
+              [`${chartObject.repo}/${chartObject.name}`]: chartObject.version,
+            });
+          }, {})
+        ),
+      }),
+      null,
+      2
+    )
+  );
+
+  return await linkAllRelevantPackagesToBaseKustomize(projectRoot, targetChartVersions);
 }
 
-async function installAllPackagesFromHelmJSON() {
-  let projectRoot = await findProjectRoot('helm.json') || await findProjectRoot('package.json');
+async function installAllPackagesFromHelmJSON(projectRoot, helmJSON) {
+  let targetHelmPackages = await Promise.all(
+    Object.keys(helmJSON.dependencies).map((dependency) => installPackageToProject(dependency, projectRoot, helmJSON))
+  );
 
-  if (!(await fs.exists(`${projectRoot}/helm.json`)) {
-    throw new Error('helm.json does not exists in this project. Did you run $ helm init first?');
-  } else if (!(await fs.exists(`${projectRoot}/helm_charts`)) {
-    await fs.mkdirp(`${projectRoot}/helm_charts`);
+  return await linkAllRelevantPackagesToBaseKustomize(projectRoot, targetHelmPackages);
+}
 
-    console.log(chalk.cyan(`created helm_charts folder on ${projectRoot}/helm_charts/`));
+// NOTE: dependency: { repo, name, version }
+async function installPackageToProject(dependency = {}, projectRoot, helmJSON) {
+  let { repo, name } = dependency;
+  let declaredExistingPackageVersion = helmJSON.dependencies[`${repo}/${name}`];
+  let version = dependency.version || declaredExistingPackageVersion || (await getLatestPackage(dependency));
+
+  await fs.remove(`${projectRoot}/helm_charts/${name}`);
+  await shell(`helm pull ${repo}/${name} --untar --untardir ${projectRoot}/helm_charts --version ${version}`);
+
+  if (!(await fs.pathExists(`${projectRoot}/k8s/bases/${name}`))) {
+    await fs.mkdirp(`${projectRoot}/k8s/bases/${name}`);
+    await fs.writeFile(
+      `${projectRoot}/k8s/bases/${name}/kustomization.yaml`,
+      YAML.stringify({
+        kind: 'Kustomization',
+        apiVersion: 'kustomize.config.k8s.io/v1beta1',
+        resources: ['helm.yaml'],
+      })
+    );
   }
 
-  let helmJSON = JSON.parse((await fs.readFile(`${projectRoot}/helm.json`)).toString());
-  let installConfiguration = { projectRoot, helmJSON, saveToJSONMode: false };
+  await buildHelmChart(projectRoot, dependency.repo, dependency.name);
 
-  return await Promise.all(
-    Object.keys(helmJSON.dependencies).map((dependency) => {
-      return installPackageToProject(dependency, installConfiguration);
+  return { repo, name, version };
+}
+
+async function getLatestPackage(dependency) {
+  let { stdout } = await shell(`helm search repo ${dependency.repo}/${dependency.name} -o json`);
+
+  return JSON.parse(stdout)[0].version;
+}
+
+async function linkAllRelevantPackagesToBaseKustomize(projectRoot, targetHelmPackages) {
+  let existingKustomizationYAML = YAML.parse(
+    (await fs.readFile(`${projectRoot}/k8s/bases/kustomization.yaml`)).toString()
+  );
+  let existingChatLinks = existingKustomizationYAML.bases || [];
+  let targetKustomizationYAML = YAML.stringify(
+    Object.assign(existingKustomizationYAML, {
+      bases: [...new Set(existingChatLinks.concat(targetHelmPackages.map((chart) => chart.name)))],
     })
   );
+
+  return fs.writeFile(`${projectRoot}/k8s/bases/kustomization.yaml`, targetKustomizationYAML);
 }
-
-// NOTE: installConfiguration: { projectRoot, helmJSON, saveToJSONMode, }
-async function installPackageToProject(dependency = {}, installConfiguration) {
-  let declaredExistingPackageVersion = helmJSON.dependencies[`${dependency.repo}/${dependency.name}`];
-
-  if (declaredExistingPackageVersion && (declaredExistingPackageVersion !== dependency.version)) {
-    // I should definitely upgrade
-    // should I downgrade?
-  }
-
-  return await shell(`helm pull ${dependency.repo}/${dependency.name} --untar --untardir ${projectRoot}/helm_charts`);
-
-  // TODO: addHelmPackageToHelmJSON
-}
-
-// async function addHelmPackageToHelmJSON() {}
-
