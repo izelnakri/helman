@@ -5,18 +5,21 @@ import fs from 'fs-extra';
 import semver from 'semver';
 import YAML from 'yaml';
 import findProjectRoot from '../utils/find-project-root.js';
+import Console from '../utils/console.js';
 import { setupHelmChartsFolder, setupK8SKustomizeFolder } from './init.js';
 import { buildHelmChart } from './build.js';
 
 const shell = promisify(exec);
 
+// TODO: helm repo ls -o json // verify against the repos if repo exists
 // TODO: k8s/bases/$chartName + building per each install + console notifications
 // NOTE: dependencies: { repo/chartName: version, repo/chartName: version }
 export default async function () {
   let projectRoot = (await findProjectRoot('helm.json')) || (await findProjectRoot('package.json'));
+  let existingRepos = JSON.parse((await shell('helm repo ls -o json')).stdout).map((repo) => repo.name);
 
   if (!(await fs.pathExists(`${projectRoot}/helm.json`))) {
-    throw new Error('helm.json does not exists in this project. Did you run $ helm init first?');
+    Console.error('helm.json does not exists in this project. Did you run $ helm init first?');
   } else if (!(await fs.pathExists(`${projectRoot}/helm_charts`))) {
     await setupHelmChartsFolder(projectRoot);
   }
@@ -29,7 +32,7 @@ export default async function () {
   let targetArgs = process.argv.slice(3);
 
   if (targetArgs.length === 0) {
-    return await installAllPackagesFromHelmJSON(projectRoot, helmJSON);
+    return await installAllPackagesFromHelmJSON(projectRoot, helmJSON, existingRepos);
   }
 
   let targetHelmPackages = targetArgs.reduce((result, arg) => {
@@ -40,9 +43,12 @@ export default async function () {
       result[lastIndex] = Object.assign(lastItem, { version: semver.valid(semver.coerce(arg)) });
     } else {
       let repo = arg.includes('/') ? arg.split('/')[0] : 'stable';
-      let name = arg.includes('/') ? arg.slice(arg.indexOf('/') + 1) : arg;
 
-      result.push({ name, repo });
+      if (!existingRepos.includes(repo)) {
+        Console.error(`${repo} does not exists in your local helm repos. Make sure you do $ helm repo add ${repo} first`);
+      }
+
+      result.push({ name: arg.includes('/') ? arg.slice(arg.indexOf('/') + 1) : arg, repo });
     }
 
     return result;
@@ -60,7 +66,7 @@ export default async function () {
           helmJSON.dependencies,
           targetChartVersions.reduce((result, chartObject) => {
             return Object.assign(result, {
-              [`${chartObject.repo}/${chartObject.name}`]: chartObject.version,
+              [`${chartObject.repo}/${chartObject.name}`]: semver.coerce(chartObject.version).version
             });
           }, {})
         ),
@@ -73,10 +79,20 @@ export default async function () {
   return await linkAllRelevantPackagesToBaseKustomize(projectRoot, targetChartVersions);
 }
 
-async function installAllPackagesFromHelmJSON(projectRoot, helmJSON) {
-  let targetHelmPackages = await Promise.all(
-    Object.keys(helmJSON.dependencies).map((dependency) => installPackageToProject(dependency, projectRoot, helmJSON))
-  );
+async function installAllPackagesFromHelmJSON(projectRoot, helmJSON, existingRepos) {
+  let targetHelmPackages = await Promise.all(Object.keys(helmJSON.dependencies).map((dependencyName) => {
+    let [repo, name] = dependencyName.split('/');
+
+    if (!existingRepos.includes(repo)) {
+      Console.error(`${repo} does not exists in your local helm repos. Make sure you do $ helm repo add ${repo} first`);
+    }
+
+    return installPackageToProject(
+      { name, repo, version: helmJSON.dependencies[dependencyName] },
+      projectRoot,
+      helmJSON
+    );
+  }));
 
   return await linkAllRelevantPackagesToBaseKustomize(projectRoot, targetHelmPackages);
 }
@@ -86,6 +102,8 @@ async function installPackageToProject(dependency = {}, projectRoot, helmJSON) {
   let { repo, name } = dependency;
   let declaredExistingPackageVersion = helmJSON.dependencies[`${repo}/${name}`];
   let version = dependency.version || declaredExistingPackageVersion || (await getLatestPackage(dependency));
+
+  console.log(`Downloading ${repo}/${name} ${version}`);
 
   await fs.remove(`${projectRoot}/helm_charts/${name}`);
   await shell(`helm pull ${repo}/${name} --untar --untardir ${projectRoot}/helm_charts --version ${version}`);
