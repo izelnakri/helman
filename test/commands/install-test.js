@@ -127,6 +127,7 @@ test.serial('$ helman install $chartName $anotherChartName works', async (t) => 
 
   t.deepEqual(helmJSON.dependencies, {});
 
+  await shell('helm repo add jetstack https://charts.jetstack.io');
   await shell(`node ${CWD}/cli.js install stable/nginx-ingress jetstack/cert-manager`);
 
   const newHelmJSON = JSON.parse((await fs.readFile(`${CWD}/helm.json`)).toString());
@@ -153,7 +154,7 @@ test.serial('$ helman install $chartName $anotherChartName works', async (t) => 
   ]);
 });
 
-test('$ helman install $chartName $firstVersion $anotherChartName $thirdChartName $thirdChartNameVersion works', async (t) => {
+test.serial('$ helman install $chartName $firstVersion $anotherChartName $thirdChartName $thirdChartNameVersion works', async (t) => {
   await shell(`node ${CWD}/cli.js init`);
 
   t.deepEqual(
@@ -172,6 +173,7 @@ test('$ helman install $chartName $firstVersion $anotherChartName $thirdChartNam
 
   t.deepEqual(helmJSON.dependencies, {});
 
+  await shell('helm repo add jetstack https://charts.jetstack.io');
   await shell(
     `node ${CWD}/cli.js install stable/nginx-ingress v0.8.5 stable/docker-registry jetstack/cert-manager 0.12.0`
   );
@@ -181,18 +183,17 @@ test('$ helman install $chartName $firstVersion $anotherChartName $thirdChartNam
     fs.readFile(`${CWD}/helm_charts/docker-registry/Chart.yaml`),
     fs.readFile(`${CWD}/helm_charts/nginx-ingress/Chart.yaml`),
   ]);
-  const [ingressChartYAML, certManagerChartYAML, dockerRegistryChartYAML] = charts.map((chart) => {
-    return YAML.parse(chart.toString());
-  });
+  const [certManagerChartYAML, dockerRegistryChartYAML, ingressChartYAML] = charts
+    .map((chart) => YAML.parse(chart.toString()));
 
   t.deepEqual(Object.keys(newHelmJSON.dependencies), [
     'stable/nginx-ingress',
     'stable/docker-registry',
     'jetstack/cert-manager',
   ]);
-  // t.true(semver.gt(newHelmJSON.dependencies['stable/nginx-ingress'], '1.0.0'));
-  // t.true(semver.gt(newHelmJSON.dependencies['stable/nginx-ingress'], '1.0.0'));
-  // t.true(semver.gt(newHelmJSON.dependencies['jetstack/cert-manager'], '0.12.0'));
+  t.true(newHelmJSON.dependencies['stable/nginx-ingress'] === '0.8.5');
+  t.true(semver.gt(newHelmJSON.dependencies['stable/docker-registry'], '1.0.0'));
+  t.true(newHelmJSON.dependencies['jetstack/cert-manager'] === '0.12.0');
   t.deepEqual(
     await Promise.all([
       fs.exists(`${CWD}/helm_charts/nginx-ingress`),
@@ -204,8 +205,9 @@ test('$ helman install $chartName $firstVersion $anotherChartName $thirdChartNam
     ]),
     [true, true, true, true, true, true]
   );
-  // t.true(semver.gt(ingressChartYAML.version, '1.0.0'));
-  // t.true(semver.gt(certManagerYAML.version, '0.12.0'));
+  t.true(ingressChartYAML.version === '0.8.5');
+  t.true(semver.gt(dockerRegistryChartYAML.version, '1.0.0'));
+  t.true(certManagerChartYAML.version === 'v0.12.0');
   t.deepEqual(YAML.parse((await fs.readFile(`${CWD}/k8s/bases/kustomization.yaml`)).toString()).bases, [
     'nginx-ingress',
     'docker-registry',
@@ -213,10 +215,138 @@ test('$ helman install $chartName $firstVersion $anotherChartName $thirdChartNam
   ]);
 });
 
-// test('$ helman install can install all the charts on helm.json correctly', async (t) => {
+test.serial('$ helman install can install all the charts on helm.json correctly', async (t) => {
+  await shell(`node ${CWD}/cli.js init`);
+  await fs.writeFile(`${CWD}/helm.json`, JSON.stringify({
+    dependencies: {
+      'stable/docker-registry': '1.9.2',
+      'stable/nginx-ingress': '0.8.5',
+      'jetstack/cert-manager': '0.12.0'
+    }
+  }));
 
-// });
+  t.deepEqual(
+    await Promise.all([
+      fs.exists(`${CWD}/helm_charts/cert-manager`),
+      fs.exists(`${CWD}/helm_charts/docker-registry`),
+      fs.exists(`${CWD}/helm_charts/nginx-ingress`),
+      fs.exists(`${CWD}/k8s/bases/cert-manager`),
+      fs.exists(`${CWD}/k8s/bases/docker-registry`),
+      fs.exists(`${CWD}/k8s/bases/nginx-ingress`),
+    ]),
+    [false, false, false, false, false, false]
+  );
 
-// test('$ helman install can install all the charts on helm.json correctly when some charts already exists', async (t) => {
+  await shell('helm repo add jetstack https://charts.jetstack.io');
+  await shell(`node ${CWD}/cli.js install`);
 
-// });
+  const newHelmJSON = JSON.parse((await fs.readFile(`${CWD}/helm.json`)).toString());
+  const charts = await Promise.all([
+    fs.readFile(`${CWD}/helm_charts/cert-manager/Chart.yaml`),
+    fs.readFile(`${CWD}/helm_charts/docker-registry/Chart.yaml`),
+    fs.readFile(`${CWD}/helm_charts/nginx-ingress/Chart.yaml`),
+  ]);
+  const [certManagerChartYAML, dockerRegistryChartYAML, ingressChartYAML] = charts
+    .map((chart) => YAML.parse(chart.toString()));
+
+  t.deepEqual(Object.keys(newHelmJSON.dependencies), [
+    'stable/docker-registry',
+    'stable/nginx-ingress',
+    'jetstack/cert-manager',
+  ]);
+  t.true(newHelmJSON.dependencies['stable/nginx-ingress'] === '0.8.5');
+  t.true(newHelmJSON.dependencies['stable/docker-registry'] === '1.9.2');
+  t.true(newHelmJSON.dependencies['jetstack/cert-manager'] === '0.12.0');
+  t.deepEqual(
+    await Promise.all([
+      fs.exists(`${CWD}/helm_charts/nginx-ingress`),
+      fs.exists(`${CWD}/helm_charts/docker-registry`),
+      fs.exists(`${CWD}/helm_charts/cert-manager`),
+      fs.exists(`${CWD}/k8s/bases/nginx-ingress/kustomization.yaml`),
+      fs.exists(`${CWD}/k8s/bases/docker-registry/kustomization.yaml`),
+      fs.exists(`${CWD}/k8s/bases/cert-manager/kustomization.yaml`),
+    ]),
+    [true, true, true, true, true, true]
+  );
+  t.true(ingressChartYAML.version === '0.8.5');
+  t.true(dockerRegistryChartYAML.version === '1.9.2');
+  t.true(certManagerChartYAML.version === 'v0.12.0');
+  t.deepEqual(YAML.parse((await fs.readFile(`${CWD}/k8s/bases/kustomization.yaml`)).toString()).bases, [
+    'docker-registry',
+    'nginx-ingress',
+    'cert-manager',
+  ]);
+});
+
+test.serial('$ helman install can install all the charts on helm.json correctly when some charts already exists', async (t) => {
+  await shell(`node ${CWD}/cli.js init`);
+
+  await fs.writeFile(`${CWD}/helm.json`, JSON.stringify({
+    dependencies: {
+      'stable/docker-registry': '1.9.2',
+      'stable/nginx-ingress': '0.8.5',
+    }
+  }));
+
+  await shell('helm repo add jetstack https://charts.jetstack.io');
+  await shell(`node ${CWD}/cli.js install jetstack/cert-manager 0.12.0`);
+
+  t.deepEqual(
+    await Promise.all([
+      fs.exists(`${CWD}/helm_charts/cert-manager`),
+      fs.exists(`${CWD}/helm_charts/docker-registry`),
+      fs.exists(`${CWD}/helm_charts/nginx-ingress`),
+      fs.exists(`${CWD}/k8s/bases/cert-manager`),
+      fs.exists(`${CWD}/k8s/bases/docker-registry`),
+      fs.exists(`${CWD}/k8s/bases/nginx-ingress`),
+    ]),
+    [true, false, false, true, false, false]
+  );
+
+  const helmJSON = JSON.parse((await fs.readFile(`${CWD}/helm.json`)).toString());
+
+  t.deepEqual(helmJSON.dependencies, {
+    'stable/docker-registry': '1.9.2',
+    'stable/nginx-ingress': '0.8.5',
+    'jetstack/cert-manager': '0.12.0'
+  });
+
+  await shell(`node ${CWD}/cli.js install`);
+
+  const newHelmJSON = JSON.parse((await fs.readFile(`${CWD}/helm.json`)).toString());
+  const charts = await Promise.all([
+    fs.readFile(`${CWD}/helm_charts/cert-manager/Chart.yaml`),
+    fs.readFile(`${CWD}/helm_charts/docker-registry/Chart.yaml`),
+    fs.readFile(`${CWD}/helm_charts/nginx-ingress/Chart.yaml`),
+  ]);
+  const [certManagerChartYAML, dockerRegistryChartYAML, ingressChartYAML] = charts
+    .map((chart) => YAML.parse(chart.toString()));
+
+  t.deepEqual(Object.keys(newHelmJSON.dependencies), [
+    'stable/docker-registry',
+    'stable/nginx-ingress',
+    'jetstack/cert-manager'
+  ]);
+  t.true(newHelmJSON.dependencies['stable/nginx-ingress'] === '0.8.5');
+  t.true(semver.gt(newHelmJSON.dependencies['stable/docker-registry'], '1.0.0'));
+  t.true(newHelmJSON.dependencies['jetstack/cert-manager'] === '0.12.0');
+  t.deepEqual(
+    await Promise.all([
+      fs.exists(`${CWD}/helm_charts/nginx-ingress`),
+      fs.exists(`${CWD}/helm_charts/docker-registry`),
+      fs.exists(`${CWD}/helm_charts/cert-manager`),
+      fs.exists(`${CWD}/k8s/bases/nginx-ingress/kustomization.yaml`),
+      fs.exists(`${CWD}/k8s/bases/docker-registry/kustomization.yaml`),
+      fs.exists(`${CWD}/k8s/bases/cert-manager/kustomization.yaml`),
+    ]),
+    [true, true, true, true, true, true]
+  );
+  t.true(ingressChartYAML.version === '0.8.5');
+  t.true(semver.gt(dockerRegistryChartYAML.version, '1.0.0'));
+  t.true(certManagerChartYAML.version === 'v0.12.0');
+  t.deepEqual(YAML.parse((await fs.readFile(`${CWD}/k8s/bases/kustomization.yaml`)).toString()).bases, [
+    'cert-manager',
+    'docker-registry',
+    'nginx-ingress'
+  ]);
+});

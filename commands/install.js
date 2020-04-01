@@ -45,7 +45,9 @@ export default async function () {
       let repo = arg.includes('/') ? arg.split('/')[0] : 'stable';
 
       if (!existingRepos.includes(repo)) {
-        Console.error(`${repo} does not exists in your local helm repos. Make sure you do $ helm repo add ${repo} first`);
+        Console.error(
+          `${repo} does not exists in your local helm repos. Make sure you do $ helm repo add ${repo} first`
+        );
       }
 
       result.push({ name: arg.includes('/') ? arg.slice(arg.indexOf('/') + 1) : arg, repo });
@@ -66,7 +68,7 @@ export default async function () {
           helmJSON.dependencies,
           targetChartVersions.reduce((result, chartObject) => {
             return Object.assign(result, {
-              [`${chartObject.repo}/${chartObject.name}`]: semver.coerce(chartObject.version).version
+              [`${chartObject.repo}/${chartObject.name}`]: semver.coerce(chartObject.version).version,
             });
           }, {})
         ),
@@ -80,19 +82,23 @@ export default async function () {
 }
 
 async function installAllPackagesFromHelmJSON(projectRoot, helmJSON, existingRepos) {
-  let targetHelmPackages = await Promise.all(Object.keys(helmJSON.dependencies).map((dependencyName) => {
-    let [repo, name] = dependencyName.split('/');
+  let targetHelmPackages = await Promise.all(
+    Object.keys(helmJSON.dependencies).map((dependencyName) => {
+      let [repo, name] = dependencyName.split('/');
 
-    if (!existingRepos.includes(repo)) {
-      Console.error(`${repo} does not exists in your local helm repos. Make sure you do $ helm repo add ${repo} first`);
-    }
+      if (!existingRepos.includes(repo)) {
+        Console.error(
+          `${repo} does not exists in your local helm repos. Make sure you do $ helm repo add ${repo} first`
+        );
+      }
 
-    return installPackageToProject(
-      { name, repo, version: helmJSON.dependencies[dependencyName] },
-      projectRoot,
-      helmJSON
-    );
-  }));
+      return installPackageToProject(
+        { name, repo, version: helmJSON.dependencies[dependencyName] },
+        projectRoot,
+        helmJSON
+      );
+    })
+  );
 
   return await linkAllRelevantPackagesToBaseKustomize(projectRoot, targetHelmPackages);
 }
