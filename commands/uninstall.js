@@ -6,7 +6,6 @@ import YAML from 'yaml';
 export default async function () {
   let projectRoot = (await findProjectRoot('helm.json')) || (await findProjectRoot('package.json'));
 
-  console.log(process.argv);
   if (!(await fs.pathExists(`${projectRoot}/helm.json`))) {
     Console.error('helm.json does not exists in this project. Did you run $ helm init first?');
   } else if (!process.argv[3]) {
