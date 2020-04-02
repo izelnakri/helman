@@ -27,11 +27,11 @@ export default async function () {
   let helmJSONDependencyKeys = helmDependencies.map((dependencyReference) => dependencyReference.split('/'));
 
   return await Promise.all(
-    targetArgs.map((arg) => {
+    targetArgs.map(async (arg) => {
       let targetHelmJSONDependency = arg.includes('/') ? arg : findChartFromHelmJSON(helmJSONDependencyKeys, arg);
       let [repo, name] = targetHelmJSONDependency.split('/');
 
-      return buildHelmChart(projectRoot, repo, name);
+      return await buildHelmChart(projectRoot, repo, name);
     })
   );
 }
@@ -46,10 +46,16 @@ export function buildAllPackagesFromHelmJSON(projectRoot, helmJSONDependencies) 
   );
 }
 
-export function buildHelmChart(projectRoot, repoName, chartName) {
-  return shell(
-    `helm template ${projectRoot}/helm_charts/${chartName} > ${projectRoot}/k8s/bases/${chartName}/helm.yaml`
-  );
+export async function buildHelmChart(projectRoot, repoName, chartName) {
+  let targetDirectory = `${projectRoot}/k8s/bases/${chartName}`;
+
+  if (await fs.pathExists(`${targetDirectory}/values.yaml`)) {
+    return shell(
+      `helm template ${projectRoot}/helm_charts/${chartName} > ${targetDirectory}/helm.yaml --values ${targetDirectory}/values.yaml`
+    );
+  }
+
+  return shell(`helm template ${projectRoot}/helm_charts/${chartName} > ${targetDirectory}/helm.yaml`);
 }
 
 function findChartFromHelmJSON(helmJSONDependencyKeys, chartName) {
