@@ -12,9 +12,9 @@ export default async function() {
 
   console.log(`${highlight("helman v" + config.version + " Usage:")} helman ${chalk.yellow('<command (Default: help)>')}
 helman init | new                     # Sets up the initial helm.json, helm_charts and k8s kustomize folder
-helman install | i [chartName]        # Installs the latest helm chart to helm_charts and adds it to helm.json
-helman uninstall | u [chartName]      # [soon] Uninstall the helm chart from helm_charts, helm.json and k8s kustomize folder
-helman build | b                      # [soon] reads all charts from helm.json and helm templates/outputs them to k8s kustomization base for each chart
+helman install | i [chartName]        # Installs the latest helm chart to helm_charts and adds it to helm.json and k8s kustomize structure
+helman uninstall | u [chartName]      # Uninstall the helm chart from helm_charts, helm.json and k8s kustomize folder
+helman build                          # Reads all charts from helm.json and helm templates/outputs them to k8s kustomization base for each chart
 `);
   // TODO: helman outdated command
 }

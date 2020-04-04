@@ -1,12 +1,15 @@
 import chalk from 'ansi-colors';
 import fs from 'fs-extra';
+import Console from '../utils/console.js';
 import findProjectRoot from '../utils/find-project-root.js';
 
 export default async function () {
   const projectRoot =
     (await findProjectRoot('helm.json')) || (await findProjectRoot('package.json'));
 
-  if (!(await fs.pathExists(`${projectRoot}/helm.json`))) {
+  if (!projectRoot) {
+    Console.error('no package.json or helm.json found in the project directory or its parent directories. Did you do $ npm init?');
+  } else if (!(await fs.pathExists(`${projectRoot}/helm.json`))) {
     await setupHelmJSON(projectRoot);
   }
 

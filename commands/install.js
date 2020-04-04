@@ -11,6 +11,7 @@ import { buildHelmChart } from './build.js';
 
 const shell = promisify(exec);
 
+// TODO: better error message when repo is not found or package is not found
 // TODO: helm repo ls -o json // verify against the repos if repo exists
 // TODO: k8s/bases/$chartName + building per each install + console notifications
 // NOTE: dependencies: { repo/chartName: version, repo/chartName: version }
@@ -126,7 +127,10 @@ async function installPackageToProject(dependency = {}, projectRoot, helmJSON) {
     );
   }
 
-  await buildHelmChart(projectRoot, dependency.repo, dependency.name);
+  await Promise.all([
+    buildHelmChart(projectRoot, dependency.repo, dependency.name),
+    createValuesYAMLIFNotExists(projectRoot, dependency.repo, dependency.name),
+  ]);
 
   return { repo, name, version };
 }
@@ -149,4 +153,13 @@ async function linkAllRelevantPackagesToBaseKustomize(projectRoot, targetHelmPac
   );
 
   return fs.writeFile(`${projectRoot}/k8s/bases/kustomization.yaml`, targetKustomizationYAML);
+}
+
+async function createValuesYAMLIFNotExists(projectRoot, repoName, chartName) {
+  if (!(await fs.exists(`${projectRoot}/k8s/bases/${chartName}/values.yaml`))) {
+    return await fs.copy(
+      `${projectRoot}/helm_charts/${chartName}/values.yaml`,
+      `${projectRoot}/k8s/bases/${chartName}/values.yaml`
+    );
+  }
 }

@@ -1,4 +1,7 @@
-make values.yaml integration work on k8s/bases/$chartName work
+make $ helman analyze
+- always copy the existing values.yaml(with values overwritten)
+and remove unused ones on $ helman build
+
 
 helm repo add stable
 helm repo update

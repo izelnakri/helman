@@ -1,6 +1,7 @@
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import fs from 'fs-extra';
+import YAML from 'yaml';
 import Console from '../utils/console.js';
 import findProjectRoot from '../utils/find-project-root.js';
 
@@ -49,13 +50,20 @@ export function buildAllPackagesFromHelmJSON(projectRoot, helmJSONDependencies) 
 export async function buildHelmChart(projectRoot, repoName, chartName) {
   let targetDirectory = `${projectRoot}/k8s/bases/${chartName}`;
 
-  if (await fs.pathExists(`${targetDirectory}/values.yaml`)) {
-    return shell(
-      `helm template ${projectRoot}/helm_charts/${chartName} > ${targetDirectory}/helm.yaml --values ${targetDirectory}/values.yaml`
+  if (!(await fs.pathExists(`${targetDirectory}/values.yaml`))) {
+    await fs.copy(
+      `${projectRoot}/helm_charts/${chartName}/values.yaml`,
+      `${projectRoot}/k8s/bases/${chartName}/values.yaml`
     );
   }
 
-  return shell(`helm template ${projectRoot}/helm_charts/${chartName} > ${targetDirectory}/helm.yaml`);
+  let values = YAML.parse((await fs.readFile(`${projectRoot}/k8s/bases/${chartName}/values.yaml`)).toString());
+  let releaseName = values.releaseName || 'RELEASE-NAME';
+  let namespace = values.namespace || 'default';
+
+  return shell(
+    `helm template ${projectRoot}/helm_charts/${chartName} > ${targetDirectory}/helm.yaml --values ${targetDirectory}/values.yaml --name-template=${releaseName} --namespace=${namespace}`
+  );
 }
 
 function findChartFromHelmJSON(helmJSONDependencyKeys, chartName) {
