@@ -18,23 +18,32 @@ export default async function () {
   }
 
   let helmJSON = JSON.parse((await fs.readFile(`${projectRoot}/helm.json`)).toString());
-
-  const chartVersionsOutput = await Promise.all(
+  let chartVersionsOutput = await Promise.all(
     Object.keys(helmJSON.dependencies).map((dependencyReference) => shell(`helm search repo ${dependencyReference} -l`))
-  );
+  )
+  let [chartCurrentVersionArray, chartVersionLinesArray, chartCurrentAppVersionsArray] = chartVersionsOutput.reduce((result, chartVersionOutput) => {
+    let chartVersionLines = chartVersionOutput.stdout
+      .split('\n')
+      .slice(1, 4)
+      .map((versionLine) => versionLine.split('\t').map((column) => column.trim()));
+    let chartCurrentVersion = helmJSON.dependencies[chartVersionLines[0][0]];
+
+    result[0].push(chartCurrentVersion);
+    result[1].push(chartVersionLines);
+    result[2].push(getCurrentAppVersion(chartCurrentVersion, chartVersionLines));
+
+    return result;
+  }, [[], [], []]);
+  await Promise.all(chartCurrentAppVersionsArray);
 
   let table;
-  let shouldPrintOutdatedInformation = await chartVersionsOutput.reduce(
-    async (hasPrintedAnOutdatedVersion, chartProc) => {
-      let chartVersionLines = chartProc.stdout
-        .split('\n')
-        .slice(1, 4)
-        .map((versionLine) => versionLine.split('\t').map((column) => column.trim()));
-      let chartCurrentVersion = helmJSON.dependencies[chartVersionLines[0][0]];
+  let shouldPrintOutdatedInformation = await chartVersionLinesArray.reduce(
+    async (hasPrintedAnOutdatedVersion, chartVersionLines, chartIndex) => {
+      let chartCurrentVersion = chartCurrentVersionArray[chartIndex];
       let chartIsOutdated = semver.lt(chartCurrentVersion, chartVersionLines[0][1]);
 
       if (chartIsOutdated && !hasPrintedAnOutdatedVersion) {
-        let chartCurrentAppVersion = await getCurrentAppVersion(chartCurrentVersion, chartVersionLines);
+        let chartCurrentAppVersion = await chartCurrentAppVersionsArray[chartIndex];
 
         table = new Table({
           head: [
@@ -51,7 +60,7 @@ export default async function () {
 
         return true;
       } else if (chartIsOutdated) {
-        let chartCurrentAppVersion = await getCurrentAppVersion(chartCurrentVersion, chartVersionLines);
+        let chartCurrentAppVersion = await chartCurrentAppVersionsArray[chartIndex];
 
         table.push(getOutdatedChartMetadata(chartCurrentVersion, chartCurrentAppVersion, chartVersionLines));
       }
