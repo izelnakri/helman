@@ -1,3 +1,4 @@
+import chalk from 'ansi-colors';
 import fs from 'fs-extra';
 import Console from '../utils/console.js';
 
@@ -15,5 +16,5 @@ export default async function () {
 
   await fs.copy(`${process.env.HOME}/.kube/${targetContext}`, `${HOME}/.kube/config`);
 
-  Console.log(`kubectl set-config is complete. ${HOME}/.kube/config is now ${HOME}/.kube/${targetContext}`);
+  console.log(chalk.cyan(`kubectl set-config is complete. ${HOME}/.kube/config is now ${HOME}/.kube/${targetContext}`));
 }
