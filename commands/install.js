@@ -9,7 +9,8 @@ import Console from '../utils/console.js';
 import { setupHelmChartsFolder, setupK8SKustomizeFolder } from './init.js';
 import { buildHelmChart } from './build.js';
 
-const shell = promisify(exec);
+let shell = promisify(exec);
+let SHOULD_BUILD_INSTALLS = true;
 
 // TODO: better error message when repo is not found or package is not found
 // TODO: helm repo ls -o json // verify against the repos if repo exists
@@ -42,6 +43,8 @@ export default async function () {
       let lastItem = result[lastIndex];
 
       result[lastIndex] = Object.assign(lastItem, { version: semver.valid(semver.coerce(arg)) });
+    } else if (arg.includes('no-build')) {
+      SHOULD_BUILD_INSTALLS = false;
     } else {
       let repo = arg.includes('/') ? arg.split('/')[0] : 'stable';
 
@@ -128,7 +131,7 @@ async function installPackageToProject(dependency = {}, projectRoot, helmJSON) {
   }
 
   await Promise.all([
-    buildHelmChart(projectRoot, dependency.repo, dependency.name),
+    SHOULD_BUILD_INSTALLS ? buildHelmChart(projectRoot, dependency.repo, dependency.name) : null,
     createValuesYAMLIFNotExists(projectRoot, dependency.repo, dependency.name),
   ]);
 
