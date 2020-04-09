@@ -31,7 +31,7 @@ const CLI = {
   CLI.command(['uninstall', 'u'], async () => await runCommand('./commands/uninstall.js'));
   CLI.command(['build', 'b'], async () => await runCommand('./commands/build.js'));
   CLI.command(['outdated', 'o'], async () => await runCommand('./commands/outdated.js'));
-  CLI.command(['set-config', 's'], async () => await runCommand('./commands/set-config.js'));
+  CLI.command(['config'], async () => await runCommand('./commands/config.js'));
   CLI.command(['help', 'h', 'print', 'p'], async () => await runCommand('./commands/index.js'));
 
   if (!shouldRunCommand) {
