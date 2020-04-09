@@ -15,6 +15,6 @@ helman init | new                     # Sets up the initial helm.json, helm_char
 helman install | i [chartName]        # Installs the latest helm chart to helm_charts and adds it to helm.json and k8s kustomize structure
 helman uninstall | u [chartName]      # Uninstall the helm chart from helm_charts, helm.json and k8s kustomize folder
 helman build                          # Reads all charts from helm.json and helm templates/outputs them to k8s kustomization base for each chart
+helman outdated                       # Shows a table of outdated charts based on their helm repo releases
 `);
-  // TODO: helman outdated command
 }

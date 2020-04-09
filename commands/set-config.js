@@ -2,7 +2,7 @@ import fs from 'fs-extra';
 import Console from '../utils/console.js';
 
 export default async function () {
-  let targetContext = process.argv[2];
+  let targetContext = process.argv[3];
   let HOME = process.env.HOME;
 
   if (!targetContext) {
