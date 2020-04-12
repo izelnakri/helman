@@ -16,9 +16,8 @@ export default async function () {
     Console.error('helm_charts folder does not exist in this project. Did you run $ helm install $chart first?');
   }
 
-  let helmDependencies = Object.keys(
-    JSON.parse((await fs.readFile(`${projectRoot}/helm.json`)).toString()).dependencies
-  );
+  let [helmJSONBuffer] = await Promise.all([fs.readFile(`${projectRoot}/helm.json`), shell('helm repo update')]);
+  let helmDependencies = Object.keys(JSON.parse(helmJSONBuffer.toString()).dependencies);
   let targetArgs = process.argv.slice(3);
 
   if (targetArgs.length === 0) {

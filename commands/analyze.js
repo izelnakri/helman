@@ -29,7 +29,7 @@ export default async function () {
 
         await buildHelmChart(projectRoot, repo, name);
 
-        return await analyzeHelmPackage(projectRoot, name);
+        return await analyzeHelmChart(projectRoot, name, false);
       })
     );
   }
@@ -38,43 +38,61 @@ export default async function () {
 
   await Promise.all(
     targetArgs.map(async (arg) => {
-      let targetHelmJSONDependency = arg.includes('/') ? arg : findChartFromHelmJSON(helmJSONDependencyKeys, arg);
-      let [repo, name] = targetHelmJSONDependency.split('/');
+      let isFile = arg.endsWith('.yaml') || arg.endsWith('.yml');
 
-      await buildHelmChart(projectRoot, repo, name);
+      if (!isFile) {
+        let targetHelmJSONDependency = arg.includes('/') ? arg : findChartFromHelmJSON(helmJSONDependencyKeys, arg);
+        let [repo, name] = targetHelmJSONDependency.split('/');
 
-      return await analyzeHelmPackage(projectRoot, name);
+        await buildHelmChart(projectRoot, repo, name);
+
+        return await analyzeHelmChart(projectRoot, name, isFile);
+      }
+
+      return await analyzeHelmChart(projectRoot, arg, isFile);
     })
   );
 }
 
-async function analyzeHelmPackage(projectRoot, packageName) {
-  let buildDocuments = YAML.parseAllDocuments(
-    (await fs.readFile(`${projectRoot}/k8s/bases/${packageName}/helm.yaml`)).toString()
-  );
+async function analyzeHelmChart(projectRoot, chartNameOrFile, isFile = false) {
+  let buildDocuments = await parseYAML(projectRoot, chartNameOrFile, isFile);
   let targetData = buildDocuments.reduce((result, document) => {
     let target = document.toJSON();
+    let metadata = target.metadata || {};
+
     result[target.kind] = result[target.kind] || [];
 
     result[target.kind].push({
-      name: target.metadata.name,
-      namespace: target.metadata.namespace || 'default',
+      name: metadata.name,
+      namespace: metadata.namespace || 'default',
     });
 
     return result;
   }, {});
 
   console.log(chalk.cyan('======================'));
-  console.log(chalk.cyan(`${packageName} package has ${buildDocuments.length} resources:`));
+
+  if (isFile) {
+    console.log(chalk.cyan(`${chartNameOrFile} has ${buildDocuments.length} resources:`));
+  } else {
+    console.log(chalk.cyan(`${chartNameOrFile} chart has ${buildDocuments.length} resources:`));
+  }
+
   console.log(chalk.cyan('======================'));
 
   Object.keys(targetData).forEach((documentKind) => {
     let documents = targetData[documentKind];
 
     console.log(chalk.green(`${documents.length} ${documentKind}:`));
-    console.log('======================');
+    console.log(chalk.green('======================'));
     documents.forEach((document) => {
       console.log(`${document.name} - namespace: ${chalk.yellow(document.namespace)}`);
     });
   });
+}
+
+async function parseYAML(projectRoot, chartNameOrFile, isFile) {
+  let path = isFile ? `${projectRoot}/${chartNameOrFile}` : `${projectRoot}/k8s/bases/${chartNameOrFile}/helm.yaml`;
+
+  return YAML.parseAllDocuments((await fs.readFile(path)).toString());
 }

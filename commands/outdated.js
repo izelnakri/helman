@@ -17,6 +17,8 @@ export default async function () {
     Console.error('helm.json does not exists in this project. Did you run $ helm init first?');
   }
 
+  await shell('helm repo update');
+
   let helmJSON = JSON.parse((await fs.readFile(`${projectRoot}/helm.json`)).toString());
   let chartVersionsOutput = await Promise.all(
     Object.keys(helmJSON.dependencies).map((dependencyReference) => shell(`helm search repo ${dependencyReference} -l`))

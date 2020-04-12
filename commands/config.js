@@ -1,16 +1,27 @@
 import chalk from 'ansi-colors';
 import fs from 'fs-extra';
 import Console from '../utils/console.js';
+import findProjectRoot from '../utils/find-project-root.js';
 
 export default async function () {
   let targetContext = process.argv[3];
   let HOME = process.env.HOME;
 
   if (!targetContext) {
+    let projectRoot = (await findProjectRoot('helm.json')) || (await findProjectRoot('package.json'));
+
+    if (projectRoot && (await fs.pathExists(`${projectRoot}/helm.json`))) {
+      console.log(chalk.cyan('helm.json dependencies:'));
+
+      let helmJSONBuffer = await fs.readFile(`${projectRoot}/helm.json`);
+
+      console.log(JSON.parse(helmJSONBuffer.toString()).dependencies);
+    }
+
     console.log(chalk.cyan('$ helman config $configName is missing. Showing available cluster $configNames instead:'));
+
     let directoryEntries = await fs.readdir(`${HOME}/.kube`);
 
-    // TODO: also show helman registered repos and helm.json in future
     return console.log(directoryEntries.filter((entry) => !['cache', 'config', 'http-cache'].includes(entry)));
   } else if (!(await fs.pathExists(`${HOME}/.kube/${targetContext}`))) {
     Console.error(
