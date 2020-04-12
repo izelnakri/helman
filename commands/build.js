@@ -64,9 +64,10 @@ export async function buildHelmChart(projectRoot, repoName, chartName) {
   return shell(
     `helm template ${projectRoot}/helm_charts/${chartName} > ${targetDirectory}/helm.yaml --values ${targetDirectory}/values.yaml --name-template=${releaseName} --namespace=${namespace}`
   );
+  // kustomize helm template helm_charts/nginx-ingress --values k8s/bases/nginx-ingress --name-template $releaseName --namespace $nameSpace
 }
 
-function findChartFromHelmJSON(helmJSONDependencyKeys, chartName) {
+export function findChartFromHelmJSON(helmJSONDependencyKeys, chartName) {
   let targetHelmJSONDependencyIndex = helmJSONDependencyKeys.findIndex((dependency) => dependency[1] === chartName);
 
   if (targetHelmJSONDependencyIndex === -1) {
