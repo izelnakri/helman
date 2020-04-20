@@ -58,16 +58,14 @@ async function analyzeHelmChart(projectRoot, chartNameOrFile, isFile = false) {
   let buildDocuments = await parseYAML(projectRoot, chartNameOrFile, isFile);
   let targetData = buildDocuments.reduce((result, document) => {
     let target = document.toJSON();
-    let metadata = target.metadata || {};
 
-    result[target.kind] = result[target.kind] || [];
+    if (!target) {
+      return result;
+    } else if (Array.isArray(target)) {
+      return target.reduce((targetResult, document) => addDocumentToResult(document, targetResult), result);
+    }
 
-    result[target.kind].push({
-      name: metadata.name,
-      namespace: metadata.namespace || 'default',
-    });
-
-    return result;
+    return addDocumentToResult(target, result);
   }, {});
 
   console.log(chalk.cyan('======================'));
@@ -95,4 +93,17 @@ async function parseYAML(projectRoot, chartNameOrFile, isFile) {
   let path = isFile ? `${projectRoot}/${chartNameOrFile}` : `${projectRoot}/k8s/bases/${chartNameOrFile}/helm.yaml`;
 
   return YAML.parseAllDocuments((await fs.readFile(path)).toString());
+}
+
+function addDocumentToResult(document, result) {
+  let metadata = document.metadata || {};
+
+  result[document.kind] = result[document.kind] || [];
+
+  result[document.kind].push({
+    name: metadata.name,
+    namespace: metadata.namespace || "default",
+  });
+
+  return result;
 }
