@@ -68,13 +68,30 @@ export async function diffHelmChart(projectRoot, repoName, chartName) {
   let values = YAML.parse((await fs.readFile(`${projectRoot}/k8s/bases/${chartName}/values.yaml`)).toString());
   let chartValues = YAML.parse((await fs.readFile(`${projectRoot}/helm_charts/${chartName}/values.yaml`)).toString());
 
+  ['releaseName', 'namespace'].forEach((key) => {
+    delete values[key];
+    delete chartValues[key];
+  });
+
   console.log(chalk.cyan('======================'));
   console.log(chalk.cyan(`DIFF ${chartName}:`));
   console.log(chalk.cyan('======================'));
 
   let targetDiff = diffYaml(chartValues, values);
 
-  console.log(chalk.yellow(`CHANGED: ${inspect(targetDiff.changed, { depth: null })}`));
-  console.log(chalk.green(`ADDED: ${inspect(targetDiff.added, { depth: null })}`));
-  console.log(chalk.red(`REMOVED: ${inspect(targetDiff.removed, { depth: null })}`));
+  printDiff(targetDiff.changed, 'changed');
+  printDiff(targetDiff.added, 'added');
+  printDiff(targetDiff.removed, 'removed');
+}
+
+function printDiff(object, type='changed') {
+  if (Object.keys(object).length > 0) {
+    let color = {
+      changed: 'yellow',
+      added: 'green',
+      removed: 'red'
+    }
+
+    console.log(chalk[color[type]](`${type.toUpperCase()}: ${inspect(object, { depth: null })}`));
+  }
 }
