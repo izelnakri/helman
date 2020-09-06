@@ -17,5 +17,6 @@ helman uninstall | u [chartName]      # Uninstall the helm chart from helm_chart
 helman build                          # Reads all charts from helm.json and helm templates/outputs them to k8s kustomization base for each chart
 helman analyze | a [chartName]        # Prints all the resources grouped by kind per each chart
 helman outdated                       # Shows a table of outdated charts based on their helm repo releases
+helman diff | d [chartName]           # Shows the diff between your current base values.yaml and current helm_charts/$chart values.yaml
 `);
 }

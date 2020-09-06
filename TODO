@@ -1,3 +1,5 @@
+helm upgrade flow for each chart
+
 make $ helman analyze
 - always copy the existing values.yaml(with values overwritten)
 and remove unused ones on $ helman build

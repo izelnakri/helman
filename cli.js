@@ -33,6 +33,7 @@ const CLI = {
   CLI.command(['outdated', 'o'], async () => await runCommand('./commands/outdated.js'));
   CLI.command(['config'], async () => await runCommand('./commands/config.js'));
   CLI.command(['analyze', 'a'], async () => await runCommand('./commands/analyze.js'));
+  CLI.command(['diff', 'd'], async () => await runCommand('./commands/diff.js'));
   CLI.command(['help', 'h', 'print', 'p'], async () => await runCommand('./commands/index.js'));
 
   if (!shouldRunCommand) {
